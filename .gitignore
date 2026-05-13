@@ -1,5 +1,50 @@
-node_modules
-# Keep environment variables out of version control
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+lib-cov
+coverage
+*.lcov
+.nyc_output
+
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# TypeScript / build
+*.tsbuildinfo
+dist/
+
+# Optional caches
+.npm
+.eslintcache
+.stylelintcache
+.node_repl_history
+.grunt
+bower_components
+.lock-wscript
+build/Release
+
+# Output of `npm pack`
+*.tgz
+.yarn-integrity
+
+# Environment variables
 .env
 .env.local
 .env.development.local
@@ -7,8 +52,21 @@ node_modules
 .env.production.local
 !.env.example
 
-# Build output
-dist/
-*.tsbuildinfo
-
+# Prisma / tooling
 /generated/prisma
+
+# Misc
+.DS_Store
+.tern-port
+.vscode-test
+.cache
+.parcel-cache
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
