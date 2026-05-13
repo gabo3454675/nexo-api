@@ -1,0 +1,239 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String         @id @default(cuid())
+  email           String         @unique
+  passwordHash    String
+  name            String?
+  role            UserRole       @default(USER)
+  accountStatus   AccountStatus  @default(PENDING_VERIFICATION)
+  isKycVerified   Boolean        @default(false)
+  trustScore      Int            @default(0)
+  balance         Decimal        @default(0) @db.Decimal(12, 2)
+  pushToken       String?
+  nexoPoints      Int            @default(0)
+  profileImageUrl String?
+  kycDocumentUrl  String?
+  kycProviderRef  String?
+  listings        Listing[]
+  dealMessages    DealMessage[]
+  dealsAsBuyer    Deal[]         @relation("DealBuyer")
+  dealsAsSeller   Deal[]         @relation("DealSeller")
+  feedbackGiven   DealFeedback[] @relation("DealFeedbackFromUser")
+  feedbackReceived DealFeedback[] @relation("DealFeedbackToUser")
+  topUpRequests   TopUpRequest[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+enum UserRole {
+  USER
+  TECHNICIAN
+  ADMIN
+}
+
+enum AccountStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  BANNED
+}
+
+enum ListingType {
+  PRODUCT
+  SERVICE
+}
+
+enum ListingLocation {
+  CARACAS
+  GUATIRE
+}
+
+enum ListingStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  ARCHIVED
+}
+
+enum DealStatus {
+  PENDING
+  FUNDS_LOCKED
+  DELIVERY_VERIFICATION_PENDING
+  COMPLETED
+  DISPUTED
+  CANCELLED
+}
+
+enum EscrowEventType {
+  DEAL_CREATED
+  FUNDS_LOCKED
+  DELIVERY_TOKEN_GENERATED
+  DELIVERY_TOKEN_EXPIRED
+  DELIVERY_CONFIRMED
+  FUNDS_RELEASED
+  CHAT_MESSAGE
+  PROXIMITY_HINT
+}
+
+enum EscrowEventActor {
+  BUYER
+  SELLER
+  SYSTEM
+}
+
+enum PaymentProvider {
+  PAGO_MOVIL
+  ZELLE
+}
+
+enum TopUpRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Listing {
+  id            String        @id @default(cuid())
+  ownerId       String
+  type          ListingType
+  status        ListingStatus @default(DRAFT)
+  category      String
+  location      ListingLocation
+  title         String
+  description   String?
+  imageUrls     String[]      @default([])
+  priceAmount   Decimal       @db.Decimal(12, 2)
+  priceCurrency String        @default("USD")
+  quantity      Int? // Solo aplica a PRODUCT
+  serviceUnit   String? // Solo aplica a SERVICE (ej: hora, visita)
+  metadata      Json?
+  owner         User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  deals         Deal[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([ownerId, status])
+  @@index([type, status])
+  @@index([location, category])
+}
+
+model Deal {
+  id                 String     @id @default(cuid())
+  listingId          String
+  buyerId            String
+  sellerId           String
+  status             DealStatus @default(PENDING)
+  agreedAmount       Decimal    @db.Decimal(12, 2)
+  currency           String     @default("USD")
+  lockedAt           DateTime?
+  completedAt        DateTime?
+  disputedAt         DateTime?
+  cancellationReason String?
+  listing            Listing    @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  buyer              User       @relation("DealBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller             User       @relation("DealSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  feedback           DealFeedback[]
+  escrowEvents       EscrowEvent[]
+  deliveryTokens     DeliveryToken[]
+  messages           DealMessage[]
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([listingId, status])
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+}
+
+model EscrowEvent {
+  id          String          @id @default(cuid())
+  dealId       String
+  eventType    EscrowEventType
+  fromStatus   DealStatus?
+  toStatus     DealStatus
+  actorType    EscrowEventActor
+  actorUserId  String?
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+  deal         Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, createdAt])
+  @@index([eventType, createdAt])
+}
+
+model DeliveryToken {
+  id            String   @id @default(cuid())
+  dealId         String
+  tokenHash      String   @unique
+  issuedByUserId String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  usedByUserId   String?
+  createdAt      DateTime @default(now())
+  deal           Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, createdAt])
+  @@index([expiresAt])
+}
+
+model DealMessage {
+  id        String   @id @default(cuid())
+  dealId    String
+  authorId  String
+  body      String
+  actionKey String?
+  createdAt DateTime @default(now())
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([dealId, createdAt])
+}
+
+model DealFeedback {
+  id         String   @id @default(cuid())
+  dealId     String
+  fromUserId String
+  toUserId   String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deal       Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  fromUser   User     @relation("DealFeedbackFromUser", fields: [fromUserId], references: [id], onDelete: Restrict)
+  toUser     User     @relation("DealFeedbackToUser", fields: [toUserId], references: [id], onDelete: Restrict)
+
+  @@unique([dealId, fromUserId])
+  @@index([toUserId, rating])
+}
+
+model TopUpRequest {
+  id              String             @id @default(cuid())
+  userId          String
+  provider        PaymentProvider
+  status          TopUpRequestStatus @default(PENDING)
+  amount          Decimal            @db.Decimal(12, 2)
+  currency        String             @default("USD")
+  receiptUrl      String
+  paymentRef      String?
+  notes           String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
